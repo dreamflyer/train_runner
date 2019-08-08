@@ -37,22 +37,28 @@ def is_complete(path):
     project_path = os.path.join(path, "project")
 
     experiment_path = os.path.join(project_path, "experiments")
-    experiment_path = os.path.join(project_path, "experiment")
+    experiment_path = os.path.join(experiment_path, "experiment")
 
-    summary_path = os.path.join(experiment_path, "summary")
+    in_progress_path = os.path.join(experiment_path, "inProgress.yaml")
 
-    if not os.path.exists(project_path):
+    if os.path.exists(in_progress_path):
         return False
+
+    return True
 
 def download(id, dest):
     run_cmd("kaggle kernels output " + id + " -p " + dest)
 
-def kernel_meta(kernel_path, kernel_id, username, server, title):
+def kernel_meta(kernel_path, kernel_id, username, server, title, dataset_sources, competition_sources, kernel_sources):
     result = get_template()
 
     result["id"] = username + "/" + title
     result["title"] = title
     result["code_file"] = os.path.join(kernel_path, "notebook.ipynb")
+
+    result["dataset_sources"] = dataset_sources
+    result["competition_sources"] = competition_sources
+    result["kernel_sources"] = kernel_sources
 
     ensure(kernel_path)
 

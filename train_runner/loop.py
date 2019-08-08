@@ -14,7 +14,7 @@ class Task:
     def run(self):
         self.task()
 
-def kernel_status_request_task(kernel: Kernel, on_complete):
+def kernel_status_request_task(kernel: Kernel, on_complete, wait=300):
     def task():
         while True:
             status = kernel.get_status()
@@ -27,13 +27,13 @@ def kernel_status_request_task(kernel: Kernel, on_complete):
             else:
                 print(status)
 
-    return Task(task, 10)
+    return Task(task, wait)
 
-def kernel_run_request_task(kernel: Kernel):
+def kernel_run_request_task(kernel: Kernel, wait=300):
     def task():
         kernel.push()
 
-    return Task(task, 10)
+    return Task(task, wait)
 
 class MainLoop:
     def __init__(self, project: Project):
@@ -58,7 +58,7 @@ class MainLoop:
         self.run_server()
 
         for item in self.project.kernels:
-            self.add_task(kernel_status_request_task(item, self.on_kernel_status));
+            self.add_task(kernel_status_request_task(item, self.on_kernel_status, 10));
 
         while True:
             if len(self.queue) > 0:
@@ -82,19 +82,33 @@ class MainLoop:
         if status == KERNEL_STATUS_UNKNOWN:
             kernel.archive(True)
 
-            self.add_task(kernel_run_request_task(kernel))
+            self.add_task(kernel_run_request_task(kernel, 10))
 
-            self.add_task(kernel_status_request_task(kernel, self.on_kernel_status))
+            self.add_task(kernel_status_request_task(kernel, self.on_kernel_status, 20))
 
             return
 
         if status == KERNEL_STATUS_COMPLETE:
             kernel.download()
 
+            if not kernel.is_complete():
+                kernel.archive()
+
+                self.add_task(kernel_run_request_task(kernel))
+
+                self.add_task(kernel_status_request_task(kernel, self.on_kernel_status))
+
             return
 
         if status == KERNEL_STATUS_ERROR:
             kernel.download()
+
+            if not kernel.is_complete():
+                kernel.archive()
+
+                self.add_task(kernel_run_request_task(kernel))
+
+                self.add_task(kernel_status_request_task(kernel, self.on_kernel_status))
 
             return
 

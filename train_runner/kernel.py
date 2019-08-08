@@ -45,7 +45,7 @@ class Kernel:
         self.load()
 
     def load(self):
-        self.meta = utils.kernel_meta(self.get_path(), self.id, self.project.meta["username"], self.project.meta["server"], self.get_title())
+        self.meta = utils.kernel_meta(self.get_path(), self.id, self.project.meta["username"], self.project.meta["server"], self.get_title(), self.project.meta["dataset_sources"], self.project.meta["competition_sources"], self.project.meta["kernel_sources"])
 
     def get_path(self):
         return os.path.join(self.project.root, "kernel_" + str(self.id))
@@ -84,12 +84,17 @@ class Kernel:
         return utils.archive(os.path.join(self.get_path(), "project"), os.path.join(self.get_path(), "project"))
 
     def is_complete(self):
-        pass
+        utils.is_complete(self.get_path())
 
     def push(self):
         utils.run_kernel(self.get_path())
 
     def download(self):
+        project_path = os.path.join(self.get_path(), "project")
+
+        if os.path.exists(project_path):
+            os.rmdir(project_path)
+
         utils.download(self.meta["id"], self.get_path())
 
 

@@ -8,6 +8,6 @@
   "enable_gpu": "true",
   "enable_internet": "true",
   "dataset_sources": [],
-  "competition_sources": ["freesound-audio-tagging-2019"],
+  "competition_sources": [],
   "kernel_sources": []
 }
