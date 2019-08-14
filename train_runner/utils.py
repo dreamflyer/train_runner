@@ -79,3 +79,7 @@ def ensure(path):
 def archive(src, dst):
     shutil.make_archive(dst, 'zip', os.path.dirname(src), "project")
 
+def log(path, bytes):
+    with open(path, "a") as f:
+        f.buffer.write(bytes)
+

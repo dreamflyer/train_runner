@@ -1,5 +1,7 @@
 import os
 
+import yaml
+
 from train_runner import utils
 
 import socketserver
@@ -19,12 +21,17 @@ class Project:
 
         self.kernels = []
 
+        self.folds = 0
+
         self.load()
 
         self.server: socketserver.TCPServer = None
 
     def load(self):
         self.meta = utils.read_project_meta(self.root)
+
+        with open(os.path.join(self.root, "project", "experiments", "experiment", "config.yaml")) as cfg:
+            a = yaml.parse(cfg)
 
         for item in range(self.meta["kernels"]):
             self.kernels.append(Kernel(item, self))
@@ -43,6 +50,8 @@ class Kernel:
         self.meta = None
 
         self.load()
+
+        self.skip = True
 
     def load(self):
         self.meta = utils.kernel_meta(self.get_path(), self.id, self.project.meta["username"], self.project.meta["server"], self.get_title(), self.project.meta["dataset_sources"], self.project.meta["competition_sources"], self.project.meta["kernel_sources"])
@@ -83,8 +92,11 @@ class Kernel:
 
         return utils.archive(os.path.join(self.get_path(), "project"), os.path.join(self.get_path(), "project"))
 
+    def log(self, bytes):
+        utils.log(os.path.join(self.get_path(), "kernel.log"), bytes)
+
     def is_complete(self):
-        utils.is_complete(self.get_path())
+        return utils.is_complete(self.get_path())
 
     def push(self):
         utils.run_kernel(self.get_path())

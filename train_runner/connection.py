@@ -21,7 +21,12 @@ class CustomHandler(http.server.BaseHTTPRequestHandler):
                 self.wfile.write(f.read())
 
     def do_POST(self):
-        pass
+        print("POST: " + self.path)
+
+        if "kernel" in self.path:
+            kernel = self.server.project.kernel(self.parse_kernel())
+
+            kernel.log(self.rfile.read(int(self.headers['Content-Length'])))
 
     def parse_kernel(self):
         return int(self.path.split("/").pop())
@@ -33,5 +38,3 @@ def run_server(project: Project):
         project.server = httpd
 
         httpd.serve_forever()
-
-
