@@ -41,6 +41,12 @@ class MainLoop:
 
         self.queue = []
 
+        self.running = 0
+
+        self.wait = self.project.meta["requests_delay"]
+
+        self.kernels_queue = None
+
     def add_task(self, task):
         self.queue.insert(0, task)
 
@@ -57,8 +63,9 @@ class MainLoop:
     def start(self):
         self.run_server()
 
-        for item in self.project.kernels:
-            self.add_task(kernel_status_request_task(item, self.on_kernel_status, 10));
+        self.kernels_queue = list(self.project.kernels)
+
+        self.add_kernels()
 
         while True:
             if len(self.queue) > 0:
@@ -76,46 +83,44 @@ class MainLoop:
 
                 break
 
+    def add_kernels(self):
+        while len(self.kernels_queue) and self.running < self.project.meta["kernels"]:
+            self.running += 1
+
+            self.add_task(kernel_status_request_task(self.kernels_queue.pop(), self.on_kernel_status, 10));
+
+    def run_kernel(self, kernel, wait_after_run, wait_after_status, is_initial):
+        kernel.archive(is_initial)
+
+        self.add_task(kernel_run_request_task(kernel, wait_after_run))
+
+        self.add_task(kernel_status_request_task(kernel, self.on_kernel_status, wait_after_status))
+
     def on_kernel_status(self, kernel, status):
         print("status: " + status)
 
         if status == KERNEL_STATUS_UNKNOWN:
-            kernel.archive(True)
-
-            self.add_task(kernel_run_request_task(kernel, 10))
-
-            self.add_task(kernel_status_request_task(kernel, self.on_kernel_status, 20))
+            self.run_kernel(kernel, 10, 20, True)
 
             return
 
-        if status == KERNEL_STATUS_COMPLETE:
+        if status == KERNEL_STATUS_COMPLETE or status == KERNEL_STATUS_ERROR:
             kernel.download()
 
-            if not kernel.is_complete():
-                kernel.archive()
+            if kernel.is_complete():
+                self.running -= 1
 
-                self.add_task(kernel_run_request_task(kernel))
-
-                self.add_task(kernel_status_request_task(kernel, self.on_kernel_status))
-
-            return
-
-        if status == KERNEL_STATUS_ERROR:
-            kernel.download()
-
-            if not kernel.is_complete():
-                kernel.archive()
-
-                self.add_task(kernel_run_request_task(kernel))
-
-                self.add_task(kernel_status_request_task(kernel, self.on_kernel_status))
-
+                self.add_kernels()
+            else:
+                self.run_kernel(kernel, self.wait, self.wait, False)
             return
 
         if status == KERNEL_STATUS_RUNNING:
             self.add_task(kernel_status_request_task(kernel, self.on_kernel_status))
 
             return
+
+pass
 
 MainLoop(Project("/Users/dreamflyer/Desktop/kaggle_project")).start()
 

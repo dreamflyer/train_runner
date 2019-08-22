@@ -23,9 +23,17 @@ def get_template():
 
     return result
 
-def get_notebook_template(server, kernel_id):
+def get_notebook_template(server, kernel_id, fold=-1, time=-1):
     with open("data/notebook.ipynb") as template:
-        return template.read().replace("server", server).replace("kernel_id", str(kernel_id))
+        result = template.read().replace("server", server).replace("kernel_id", str(kernel_id))
+
+        if fold >= 0:
+            result = result.replace("folds_argument", str(fold))
+
+        if time >= 0:
+            result = result.replace("timer_argument", str(time))
+
+        return result
 
 def read_project_meta(project_path):
     with open(os.path.join(project_path, "project-metadata.json")) as meta:
@@ -49,7 +57,7 @@ def is_complete(path):
 def download(id, dest):
     run_cmd("kaggle kernels output " + id + " -p " + dest)
 
-def kernel_meta(kernel_path, kernel_id, username, server, title, dataset_sources, competition_sources, kernel_sources):
+def kernel_meta(kernel_path, kernel_id, username, server, title, dataset_sources, competition_sources, kernel_sources, fold, time):
     result = get_template()
 
     result["id"] = username + "/" + title
@@ -66,7 +74,7 @@ def kernel_meta(kernel_path, kernel_id, username, server, title, dataset_sources
         json.dump(result, f)
 
     with open(os.path.join(kernel_path, "notebook.ipynb"), "w") as f:
-        f.write(get_notebook_template(server, kernel_id))
+        f.write(get_notebook_template(server, kernel_id, fold, time))
 
     return result
 

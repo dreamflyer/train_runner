@@ -27,11 +27,19 @@ class Project:
 
         self.server: socketserver.TCPServer = None
 
+        self.folds = None
+
     def load(self):
         self.meta = utils.read_project_meta(self.root)
 
         with open(os.path.join(self.root, "project", "experiments", "experiment", "config.yaml")) as cfg:
-            a = yaml.parse(cfg)
+            self.folds = yaml.load(cfg).pop("folds_count", None)
+
+        if self.meta["split_by_folds"]:
+            for item in range(self.folds):
+                self.kernels.append(Kernel(item, self, item))
+
+            return
 
         for item in range(self.meta["kernels"]):
             self.kernels.append(Kernel(item, self))
@@ -42,19 +50,19 @@ class Project:
                 return item
 
 class Kernel:
-    def __init__(self, id, project):
+    def __init__(self, id, project, fold=None):
         self.id = id
 
         self.project = project
 
         self.meta = None
 
+        self.fold=fold
+
         self.load()
 
-        self.skip = True
-
     def load(self):
-        self.meta = utils.kernel_meta(self.get_path(), self.id, self.project.meta["username"], self.project.meta["server"], self.get_title(), self.project.meta["dataset_sources"], self.project.meta["competition_sources"], self.project.meta["kernel_sources"])
+        self.meta = utils.kernel_meta(self.get_path(), self.id, self.project.meta["username"], self.project.meta["server"], self.get_title(), self.project.meta["dataset_sources"], self.project.meta["competition_sources"], self.project.meta["kernel_sources"], self.fold, self.project.meta["time"])
 
     def get_path(self):
         return os.path.join(self.project.root, "kernel_" + str(self.id))
