@@ -122,7 +122,7 @@ class MainLoop:
 
 pass
 
-MainLoop(Project("/Users/dreamflyer/Desktop/kaggle_project")).start()
+MainLoop(Project("/Users/dreamflyer/Desktop/kaggle_project/project")).start()
 
 
 

@@ -23,16 +23,44 @@ class Project:
 
         self.folds = 0
 
+        self.meta = utils.read_project_meta(self.root)
+
+        self.collect_experiment()
+
         self.load()
 
         self.server: socketserver.TCPServer = None
 
         self.folds = None
 
-    def load(self):
-        self.meta = utils.read_project_meta(self.root)
+    def collect_experiment(self):
+        utils.ensure(os.path.join(self.root, "kaggle"))
+        utils.ensure(os.path.join(self.root, "kaggle", "project"))
+        utils.ensure(os.path.join(self.root, "kaggle", "project", "experiments"))
 
-        with open(os.path.join(self.root, "project", "experiments", "experiment", "config.yaml")) as cfg:
+        def filter(item):
+            if not os.path.isdir(os.path.join(self.root, item)):
+                return False
+
+            if item == "experiments":
+                return False
+
+            if item == "kaggle":
+                return False
+
+            return True
+
+        directories = [item for item in os.listdir(self.root) if filter(item)]
+
+        for item in directories:
+            utils.copy(os.path.join(self.root, item), os.path.join(self.root, "kaggle", "project", item))
+
+        utils.copy(os.path.join(self.root, "experiments", self.meta["experiment"]), os.path.join(self.root, "kaggle", "project", "experiments", "experiment"))
+
+    def load(self):
+        utils.ensure(os.path.join(self.root, "kaggle"))
+
+        with open(os.path.join(self.root, "experiments", self.meta["experiment"], "config.yaml")) as cfg:
             self.folds = yaml.load(cfg).pop("folds_count", None)
 
         if self.meta["split_by_folds"]:
@@ -65,7 +93,7 @@ class Kernel:
         self.meta = utils.kernel_meta(self.get_path(), self.id, self.project.meta["username"], self.project.meta["server"], self.get_title(), self.project.meta["dataset_sources"], self.project.meta["competition_sources"], self.project.meta["kernel_sources"], self.fold, self.project.meta["time"])
 
     def get_path(self):
-        return os.path.join(self.project.root, "kernel_" + str(self.id))
+        return os.path.join(self.project.root, "kaggle", "kernels", "kernel_" + str(self.id))
 
     def get_title(self):
         return self.project.meta["project_id"] + "-" + str(self.id)
@@ -96,7 +124,7 @@ class Kernel:
 
     def archive(self, initial=False):
         if initial:
-            return utils.archive(os.path.join(self.project.root, "project"), os.path.join(self.get_path(), "project"))
+            return utils.archive(os.path.join(self.project.root, "kaggle", "project"), os.path.join(self.get_path(), "project"))
 
         return utils.archive(os.path.join(self.get_path(), "project"), os.path.join(self.get_path(), "project"))
 
@@ -116,6 +144,11 @@ class Kernel:
             os.rmdir(project_path)
 
         utils.download(self.meta["id"], self.get_path())
+
+# p = Project("/Users/dreamflyer/Desktop/kaggle_project/project")
+#
+# for item in p.kernels:
+#     item.archive(True)
 
 
 

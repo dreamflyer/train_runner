@@ -68,6 +68,7 @@ def kernel_meta(kernel_path, kernel_id, username, server, title, dataset_sources
     result["competition_sources"] = competition_sources
     result["kernel_sources"] = kernel_sources
 
+    ensure(os.path.dirname(kernel_path))
     ensure(kernel_path)
 
     with open(os.path.join(kernel_path, "kernel-metadata.json"), "w") as f:
@@ -91,3 +92,5 @@ def log(path, bytes):
     with open(path, "a") as f:
         f.buffer.write(bytes)
 
+def copy(src, dst):
+    return shutil.copytree(src, dst, True)
