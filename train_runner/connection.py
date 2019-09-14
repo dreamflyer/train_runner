@@ -20,6 +20,8 @@ class CustomHandler(http.server.BaseHTTPRequestHandler):
 
                 self.wfile.write(f.read())
 
+            os.remove(zip_path)
+
     def do_POST(self):
         print("POST: " + self.path)
 

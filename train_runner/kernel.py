@@ -34,6 +34,8 @@ class Project:
         self.folds = None
 
     def collect_experiment(self):
+        utils.remove(os.path.join(self.root, "kaggle", "project"))
+
         utils.ensure(os.path.join(self.root, "kaggle"))
         utils.ensure(os.path.join(self.root, "kaggle", "project"))
         utils.ensure(os.path.join(self.root, "kaggle", "project", "experiments"))
@@ -57,6 +59,14 @@ class Project:
 
         utils.copy(os.path.join(self.root, "experiments", self.meta["experiment"]), os.path.join(self.root, "kaggle", "project", "experiments", "experiment"))
 
+        data_name_path = os.path.join(os.path.join(self.root, "kaggle", "project"), "dataset_id.txt")
+
+        if not os.path.exists(data_name_path):
+            with open(data_name_path, "w+") as f:
+                dataset_id = self.meta["dataset_sources"][0] if len(self.meta["dataset_sources"]) > 0 else self.meta["competition_sources"][0]
+
+                f.write(dataset_id)
+
     def load(self):
         utils.ensure(os.path.join(self.root, "kaggle"))
 
@@ -78,7 +88,7 @@ class Project:
                 return item
 
 class Kernel:
-    def __init__(self, id, project, fold=None):
+    def __init__(self, id, project, fold=-1):
         self.id = id
 
         self.project = project
@@ -98,7 +108,7 @@ class Kernel:
     def get_title(self):
         return self.project.meta["project_id"] + "-" + str(self.id)
 
-    def get_status(self):
+    def get_status(self, after_run=False):
         return self.parse_status(utils.get_status(self.meta["id"]))
 
     def parse_status(self, status_text):
@@ -123,10 +133,12 @@ class Kernel:
         return status_text
 
     def archive(self, initial=False):
-        if initial:
-            return utils.archive(os.path.join(self.project.root, "kaggle", "project"), os.path.join(self.get_path(), "project"))
+        generated_project_path = os.path.join(self.get_path(), "project")
 
-        return utils.archive(os.path.join(self.get_path(), "project"), os.path.join(self.get_path(), "project"))
+        if initial:
+            utils.archive(os.path.join(self.project.root, "kaggle", "project"), generated_project_path)
+
+        #utils.write_dataset_meta(self.project.meta["username"], self.get_title(), generated_project_path)
 
     def log(self, bytes):
         utils.log(os.path.join(self.get_path(), "kernel.log"), bytes)
@@ -135,16 +147,18 @@ class Kernel:
         return utils.is_complete(self.get_path())
 
     def push(self):
-        utils.run_kernel(self.get_path())
+        response = utils.run_kernel(self.get_path())
+
+        if len(response) > 0:
+            print(response)
 
     def download(self):
         project_path = os.path.join(self.get_path(), "project")
 
-        if os.path.exists(project_path):
-            os.rmdir(project_path)
+        utils.remove(project_path)
 
         utils.download(self.meta["id"], self.get_path())
-
+#
 # p = Project("/Users/dreamflyer/Desktop/kaggle_project/project")
 #
 # for item in p.kernels:

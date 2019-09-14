@@ -6,34 +6,56 @@ from train_runner import connection
 
 import threading
 
+from async_promises import Promise
+
 class Task:
-    def __init__(self, task, sleep=None):
+    def __init__(self, task, sleep=None, on_complete=None):
         self.task = task
+        self.on_complete = on_complete
         self.time_to_run = time.time() + sleep
 
     def run(self):
-        self.task()
+        def rejection(cause):
+            print(cause)
 
-def kernel_status_request_task(kernel: Kernel, on_complete, wait=300):
+        Promise(lambda resolve, reject: resolve(self.task() or True)).then(lambda success: self.on_complete() or True if self.on_complete else True, rejection)
+
+def kernel_status_request_task(kernel: Kernel, on_complete, wait=300, after_run=False):
+    status = [KERNEL_STATUS_NOINTERNET]
+
+    def complete():
+        on_complete(kernel, status[0])
+
+        print("kernel_status_request_task complete")
+
     def task():
         while True:
-            status = kernel.get_status()
+            status[0] = kernel.get_status(after_run)
 
-            if status != KERNEL_STATUS_NOINTERNET:
-                on_complete(kernel, status)
-
+            if status[0] != KERNEL_STATUS_NOINTERNET:
                 break
 
             else:
-                print(status)
+                print(status[0])
 
-    return Task(task, wait)
+            time.sleep(1)
 
-def kernel_run_request_task(kernel: Kernel, wait=300):
+    print("shedule kernel_status_request_task...")
+
+    return Task(task, wait, complete)
+
+def kernel_run_request_task(kernel: Kernel, on_complete, wait=300):
     def task():
         kernel.push()
 
-    return Task(task, wait)
+    print("shedule kernel_run_request_task...")
+
+    def complete(k):
+        on_complete(k)
+
+        print("kernel_run_request_task complete")
+
+    return Task(task, wait, lambda: complete(kernel))
 
 class MainLoop:
     def __init__(self, project: Project):
@@ -76,12 +98,12 @@ class MainLoop:
                 else:
                     self.add_task(task)
 
-                time.sleep(1)
-
-            else:
+            elif self.running == 0:
                 self.shutdown()
 
                 break
+
+            time.sleep(1)
 
     def add_kernels(self):
         while len(self.kernels_queue) and self.running < self.project.meta["kernels"]:
@@ -92,9 +114,7 @@ class MainLoop:
     def run_kernel(self, kernel, wait_after_run, wait_after_status, is_initial):
         kernel.archive(is_initial)
 
-        self.add_task(kernel_run_request_task(kernel, wait_after_run))
-
-        self.add_task(kernel_status_request_task(kernel, self.on_kernel_status, wait_after_status))
+        self.add_task(kernel_run_request_task(kernel, lambda k: self.add_task(kernel_status_request_task(k, self.on_kernel_status, wait_after_status)), wait_after_run))
 
     def on_kernel_status(self, kernel, status):
         print("status: " + status)

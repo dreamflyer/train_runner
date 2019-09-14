@@ -1,9 +1,18 @@
-import os, subprocess, json, shutil
+import os, subprocess, json, shutil, time, kaggle
 
-def run_cmd(cmd):
-    result_string = os.popen(cmd).read()
+api_holder = []
 
-    return result_string
+def run_cmd(cmd, retry_after = 10):
+    try:
+        return os.popen(cmd).read()
+    except:
+        print("exception while running: " + cmd)
+
+        print("retry will be started after " + str(retry_after) + " seconds")
+
+        time.sleep(retry_after)
+
+        return run_cmd(cmd, retry_after)
 
 def get_status(kernel_id):
     cmd = "kaggle kernels status " + kernel_id
@@ -12,18 +21,68 @@ def get_status(kernel_id):
 
     return run_cmd(cmd)
 
+def get_status_api(kernel_id, retry_after = 10, after_run = False):
+    splited = kernel_id.split("/")
+
+    try:
+        result = kaggle.api.kernel_status(splited[0], splited[1])
+
+        if result["status"] == "error":
+            return 'has status "error"'
+
+        if result["status"] == "complete":
+            return 'has status "complete"'
+
+        if result["status"] == "running":
+            return 'has status "running"'
+
+    except Exception as e:
+        if 'Not Found' in str(e):
+            return "404 - Not Found"
+
+        print("exception while running: get status")
+
+        print("retry will be started after " + str(retry_after) + " seconds")
+
+        time.sleep(retry_after)
+
+        return get_status_api(kernel_id, retry_after)
+
 def run_kernel(kernel_path):
     cmd = "kaggle kernels push -p " + kernel_path
 
     return run_cmd(cmd)
 
-def get_template():
+def run_kernel_api(kernel_path, retry_after = 10):
+    try:
+        kaggle.api.kernels_push(kernel_path)
+
+        return "successfully runned: " + kernel_path
+    except Exception as e:
+        print(e)
+
+        print("exception while running: run kernel")
+
+        print("retry will be started after " + str(retry_after) + " seconds")
+
+        time.sleep(retry_after)
+
+        return run_kernel_api(kernel_path, retry_after)
+
+
+def get_kernel_template():
     with open("data/kernel-metadata-template.json") as template:
         result = json.load(template)
 
     return result
 
-def get_notebook_template(server, kernel_id, fold=-1, time=-1):
+def get_datataset_template():
+    with open("data/dataset-metadata-template.json") as template:
+        result = json.load(template)
+
+    return result
+
+def get_notebook_template(server, kernel_id, fold, time, kernel_ref):
     with open("data/notebook.ipynb") as template:
         result = template.read().replace("server", server).replace("kernel_id", str(kernel_id))
 
@@ -32,6 +91,8 @@ def get_notebook_template(server, kernel_id, fold=-1, time=-1):
 
         if time >= 0:
             result = result.replace("timer_argument", str(time))
+
+        result = result.replace("kernel_ref", kernel_ref)
 
         return result
 
@@ -55,10 +116,12 @@ def is_complete(path):
     return True
 
 def download(id, dest):
+    print("downloading: id")
+
     run_cmd("kaggle kernels output " + id + " -p " + dest)
 
 def kernel_meta(kernel_path, kernel_id, username, server, title, dataset_sources, competition_sources, kernel_sources, fold, time):
-    result = get_template()
+    result = get_kernel_template()
 
     result["id"] = username + "/" + title
     result["title"] = title
@@ -66,7 +129,7 @@ def kernel_meta(kernel_path, kernel_id, username, server, title, dataset_sources
 
     result["dataset_sources"] = dataset_sources
     result["competition_sources"] = competition_sources
-    result["kernel_sources"] = kernel_sources
+    result["kernel_sources"] = kernel_sources + [username + "/" + title]
 
     ensure(os.path.dirname(kernel_path))
     ensure(kernel_path)
@@ -75,9 +138,18 @@ def kernel_meta(kernel_path, kernel_id, username, server, title, dataset_sources
         json.dump(result, f)
 
     with open(os.path.join(kernel_path, "notebook.ipynb"), "w") as f:
-        f.write(get_notebook_template(server, kernel_id, fold, time))
+        f.write(get_notebook_template(server, kernel_id, fold, time, title))
 
     return result
+
+def write_dataset_meta(username, title, path):
+    result = get_datataset_template()
+
+    result["id"] = username + "/" + title
+    result["title"] = title
+
+    with open(os.path.join(path, "dataset-metadata.json"), "w") as f:
+        json.dump(result, f)
 
 def ensure(path):
     if os.path.exists(path):
@@ -94,3 +166,7 @@ def log(path, bytes):
 
 def copy(src, dst):
     return shutil.copytree(src, dst, True)
+
+def remove(path):
+    if os.path.exists(path):
+        shutil.rmtree(path)
